@@ -54,7 +54,8 @@ function get_data(params::Dict{String, Any}; eliminate_identical_gates = true)
 
     target_real, is_target_real = QCO.get_target_gate(params, are_elementary_gates_real, decomposition_type)
 
-    gates_dict_unique, M_real_unique, identity_idx, cnot_idx = QCO.eliminate_nonunique_gates(gates_dict, are_elementary_gates_real, eliminate_identical_gates = eliminate_identical_gates)
+    gates_dict_unique, M_real_unique, identity_idx, cnot_idx, T_idx = 
+            QCO.eliminate_nonunique_gates(gates_dict, are_elementary_gates_real, eliminate_identical_gates = eliminate_identical_gates)
 
     # Pick "Identity" if user didn't specify
     initial_gate_str = get(params, "initial_gate", "Identity")
@@ -75,6 +76,7 @@ function get_data(params::Dict{String, Any}; eliminate_identical_gates = true)
                              "initial_gate" => initial_gate,
                              "identity_idx" => identity_idx,
                              "cnot_idx" => cnot_idx,
+                             "T_idx" => T_idx,
                              "elementary_gates" => elementary_gates,
                              "target_gate" => target_real,
                              "are_gates_real" => (are_elementary_gates_real && is_target_real),
@@ -156,8 +158,9 @@ function eliminate_nonunique_gates(gates_dict::Dict{String, Any}, are_elementary
     end
 
     cnot_idx = QCO._get_cnot_idx(gates_dict_unique)
-
-    return gates_dict_unique, M_real_unique, identity_idx, cnot_idx
+    T_idx = QCO._get_T_idx(gates_dict_unique)
+    
+    return gates_dict_unique, M_real_unique, identity_idx, cnot_idx, T_idx
 end
 
 function _populate_data_angle_discretization!(data::Dict{String, Any}, params::Dict{String, Any})
@@ -258,20 +261,23 @@ function get_elementary_gates_dictionary(params::Dict{String, Any}, elementary_g
             num_angles = i in one_angle_gates ? 1 : i in two_angle_gates ? 2 : i in three_angle_gates ? 3 : 0
             
             for k in keys(M_elementary_dict) # Angle
-                for l in keys(M_elementary_dict[k]["$(num_qubits)qubit_rep"]) # qubits (which will now be 1)
-
-                    gates_dict["$counter"] = Dict{String, Any}("type"      => [elementary_gates[i]],
-                                                               "angle"     => Dict(key => M_elementary_dict[k][key] for key in angle_keys[num_angles]),
-                                                               "qubit_loc" => l,
-                                                               "matrix"    => M_elementary_dict[k]["$(num_qubits)qubit_rep"][l])
-                    counter += 1
-                end
+                gates_dict["$counter"] = Dict{String, Any}(
+                    "type"      => [elementary_gates[i]],
+                    "angle"     => Dict(key => M_elementary_dict[k][key] for key in angle_keys[num_angles]),
+                    "matrix"    => M_elementary_dict[k]["$(num_qubits)qubit_rep"]["matrix"],
+                    "qubit_loc" => M_elementary_dict[k]["$(num_qubits)qubit_rep"]["qubit_loc"]
+                )
+                counter += 1
             end
         
         else 
-            M = QCO.get_unitary(elementary_gates[i], num_qubits)
+            M = QCO.unitary(elementary_gates[i], num_qubits)
             gates_dict["$counter"] = Dict{String, Any}("type"   => [elementary_gates[i]],
                                                        "matrix" => M)
+            if !occursin(QCO.kron_symbol, elementary_gates[i])
+                gates_dict["$counter"]["qubit_loc"] = QCO._parse_gate_string(elementary_gates[i], type = false, qubits=true)
+            end
+
             counter += 1
         end
 
@@ -320,13 +326,12 @@ function get_discretized_angle_gates(gate_type::String,
         angle_dict["$(num_qubits)qubit_rep"] = Dict{String, Any}()
 
         qubit_loc = QCO._parse_gate_string(gate_type, qubits=true)
-        qubit_loc_str = join(qubit_loc, QCO.qubit_separator)
-
-        if !(gate_type in QCO.MULTI_QUBIT_GATES)
-            angle_dict["$(num_qubits)qubit_rep"]["qubit_$(qubit_loc_str)"] = QCO.get_unitary(gate_type, num_qubits, angle = angles)
-        else
-            angle_dict["$(num_qubits)qubit_rep"]["multi_qubits"] = QCO.get_unitary(gate_type, num_qubits, angle = angles)
+        if gate_type in QCO.MULTI_QUBIT_GATES && gate_type == "GR"
+            qubit_loc = Vector(1:num_qubits)
         end
+        
+        angle_dict["$(num_qubits)qubit_rep"]["matrix"] = QCO.unitary(gate_type, num_qubits, angle = angles)
+        angle_dict["$(num_qubits)qubit_rep"]["qubit_loc"] = qubit_loc
 
         M["angle_$(counter)"] = angle_dict
         counter += 1
@@ -336,7 +341,7 @@ function get_discretized_angle_gates(gate_type::String,
 end
 
 """
-    get_unitary(input::String, num_qubits::Int64; angle = nothing)
+    unitary(input::String, num_qubits::Int64; angle = nothing)
 
 Given an input string representing the gate and number of qubits of the circuit, this function returns a full-sized 
 gate with respect to the input number of qubits. For example, if `num_qubits = 3` and the input gate in `H_3` 
@@ -344,7 +349,11 @@ gate with respect to the input number of qubits. For example, if `num_qubits = 3
 qubit Identity and Hadamard gates, respectively. Note that `angle` vector is an optional input which is 
 necessary when the input gate is parametrized by Euler angles.
 """
-function get_unitary(input::String, num_qubits::Int64; angle = nothing)
+function unitary(
+    input::String, 
+    num_qubits::Int64; 
+    angle = nothing
+    )
 
     if num_qubits > 10
         Memento.error(_LOGGER, "Greater than 10 qubits is currently not supported")
@@ -499,9 +508,9 @@ function get_full_sized_kron_gate(input::String, num_qubits::Int64)
                 end
             else
                 if (qubit_loc[1] < qubit_loc[2]) || (gate_type in QCO.TWO_QUBIT_GATES_CONSTANTS_SYMMETRIC)
-                    kron_gate = QCO.get_unitary(string(gate_type, qubit_separator, 1, qubit_separator, Int(gate_width + 1)), (gate_width + 1))
+                    kron_gate = QCO.unitary(string(gate_type, qubit_separator, 1, qubit_separator, Int(gate_width + 1)), (gate_width + 1))
                 else 
-                    kron_gate = QCO.get_unitary(string(gate_type, qubit_separator, Int(gate_width + 1), qubit_separator, 1), (gate_width + 1))
+                    kron_gate = QCO.unitary(string(gate_type, qubit_separator, Int(gate_width + 1), qubit_separator, 1), (gate_width + 1))
                 end
                 M = kron(M, kron_gate)
             end
@@ -519,40 +528,33 @@ end
 Given the user input circuit which serves as a warm-start to the optimization model, and user input params dictionary, 
 this function outputs the post-processed dictionary of the input circuit which is used by the optimization model. 
 """
-function get_input_circuit_dict(input_circuit::Vector{Tuple{Int64,String}}, params::Dict{String,Any})
-
+function get_input_circuit_dict(
+    input_circuit::Vector{Tuple{Int64,String}}, 
+    params::Dict{String,Any}
+    )
+    
     input_circuit_dict = Dict{String, Any}()
-
-    status = true
-    gate_type = []
     
-    for i = 1:length(input_circuit)
-        if !(input_circuit[i][2] in params["elementary_gates"])
-            status = false
-            gate_type = input_circuit[i][2]
-        end
+    # Check if all gates are in elementary gates
+    invalid_gate = findfirst(g -> !(g[2] in params["elementary_gates"]), input_circuit)
+    if invalid_gate !== nothing
+        Memento.warn(_LOGGER, "Neglecting the input circuit as gate $(input_circuit[invalid_gate][2]) is not in input elementary gates")
+        return input_circuit_dict
     end
-
-    if status  
-        for i = 1:length(input_circuit)
     
-            if i == input_circuit[i][1]
-                input_circuit_dict["$i"] = Dict{String, Any}("depth" => input_circuit[i][1],
-                                                             "gate" => input_circuit[i][2])
-                # Later: add support for universal and rotation gates here
-            else
-                input_circuit_dict = Dict{String, Any}()          
-                Memento.warn(_LOGGER, "Neglecting the input circuit as multiple gates cannot be input at the same depth")
-                break
-            end
-
+    # Process valid gates
+    for i = 1:length(input_circuit)
+        if i == input_circuit[i][1]
+            input_circuit_dict["$i"] = Dict{String, Any}("depth" => input_circuit[i][1], "gate" => input_circuit[i][2])
+            # Later: add support for universal and rotation gates here
+        else
+            Memento.warn(_LOGGER, "Neglecting the input circuit as multiple gates cannot be input at the same depth")
+            return Dict{String, Any}()
         end
-    else
-        Memento.warn(_LOGGER, "Neglecting the input circuit as gate $gate_type is not in input elementary gates")
     end
     
     return input_circuit_dict
-end 
+end
 
 """
     _catch_input_gate_errors(gate_type::String, qubit_loc::Vector{Int64}, num_qubits::Int64, input_gate::String)
@@ -560,7 +562,13 @@ end
 Given an input gate string, number of qubits of the circuit and the qubit locations for the input gate, 
 this function catches and throws any errors, should the input gate type and qubits are invalid. 
 """
-function _catch_input_gate_errors(gate_type::String, qubit_loc::Vector{Int64}, num_qubits::Int64, input_gate::String; angle = nothing)
+function _catch_input_gate_errors(
+    gate_type::String, 
+    qubit_loc::Vector{Int64}, 
+    num_qubits::Int64, 
+    input_gate::String; 
+    angle = nothing
+    )
 
     if num_qubits <= 0
         Memento.error(_LOGGER, "Specified number of qubits has to be >= 1")
@@ -626,49 +634,34 @@ function _get_Phase_gates_idx(elementary_gates::Array{String, 1})
 end
 
 function _get_identity_idx(M::Array{Float64,3})
-    identity_idx = Int64[]
-    
-    for i=1:size(M)[3]
-        if isapprox(M[:,:,i], Matrix(I, size(M)[1], size(M)[2]), atol=1E-5)   
-            push!(identity_idx, i)
-        end
-    end
-
-    return identity_idx
+    [i for i=1:size(M)[3] if isapprox(M[:,:,i], Matrix(I, size(M)[1], size(M)[2]), atol=1E-5)]
 end
 
-function _get_cnot_idx(gates_dict::Dict{String, Any})
+function _get_gate_idx(gates_dict::Dict{String, Any}, gate_type::String)
+    local is_gate_type
     
-    cnot_idx = Int64[]
-
-    # Counts for both (CNot_i_j and CNot_j_i) or (CX_i_j and CX_j_i)
-    for i in keys(gates_dict)
-        # Input gates with kron symbols
-        if occursin(kron_symbol, gates_dict[i]["type"][1])
-            gate_types = QCO._parse_gates_with_kron_symbol(gates_dict[i]["type"][1])
-            
-            for j = 1:length(gate_types)
-                gate_type = QCO._parse_gate_string(gate_types[j], type = true)
-                if gate_type in ["CNot", "CX"]
-                    push!(cnot_idx, parse(Int64, i))
-                end
-            end
-        else
-
-        # Single input gate per depth
-            if "Identity" in gates_dict[i]["type"]
-                continue
-            end
-
-            gate_type = QCO._parse_gate_string(gates_dict[i]["type"][1], type = true)
-            if gate_type in ["CNot", "CX"]
-                push!(cnot_idx, parse(Int64, i))
-            end
-        end
+    if gate_type == "cnot_gate"
+        is_gate_type = t -> (gt = QCO._parse_gate_string(t, type=true)) == "CNot" || gt == "CX"
+    elseif gate_type == "T_gate"
+        is_gate_type = t -> (gt = QCO._parse_gate_string(t, type=true)) == "T" || gt == "Tdagger"
+    else
+        Memento.error(_LOGGER, "Unsupported gate type: $gate_type")
     end
-    
-    return cnot_idx
+
+    [ parse(Int, idx_str) 
+      for (idx_str, gate) in pairs(gates_dict)
+      if any(
+           is_gate_type,
+           occursin(kron_symbol, gate["type"][1]) ?
+             QCO._parse_gates_with_kron_symbol(gate["type"][1]) :
+             (gate["type"][1],)
+         )
+    ]
 end
+
+# Backward compatibility with existing function names
+_get_cnot_idx(gates_dict::Dict{String, Any}) = QCO._get_gate_idx(gates_dict, "cnot_gate")
+_get_T_idx(gates_dict::Dict{String, Any}) = QCO._get_gate_idx(gates_dict, "T_gate")
 
 function _get_angle_gates_idx(elementary_gates::Array{String,1})
 
@@ -691,16 +684,13 @@ end
 function _get_cnot_bounds!(data::Dict{String, Any}, params::Dict{String, Any})
     cnot_lb = get(params, "set_cnot_lower_bound", 0)
     cnot_ub = get(params, "set_cnot_upper_bound", data["maximum_depth"])
+    max_depth = data["maximum_depth"]
 
-    if cnot_lb > data["maximum_depth"]
+    if cnot_lb > max_depth
         Memento.error(_LOGGER, "Invalid lower bound on the number of CNOT gates given the maximum depth")
     elseif cnot_lb < cnot_ub
-        if cnot_lb > 0
-            data["cnot_lower_bound"] = params["set_cnot_lower_bound"]
-        end
-        if cnot_ub < data["maximum_depth"]
-            data["cnot_upper_bound"] = params["set_cnot_upper_bound"]
-        end
+        cnot_lb > 0 && (data["cnot_lower_bound"] = cnot_lb)
+        cnot_ub < max_depth && (data["cnot_upper_bound"] = cnot_ub)
     elseif isapprox(cnot_lb, cnot_ub, atol=1E-6)
         data["cnot_lower_bound"] = cnot_lb
         data["cnot_upper_bound"] = cnot_ub
