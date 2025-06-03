@@ -243,9 +243,10 @@ end
 
 function constraint_commutative_gate_pairs(qcm::QuantumCircuitModel)
     
-    objective = qcm.data["objective"]
-    max_depth = qcm.data["maximum_depth"]
-    z_bin_var = qcm.variables[:z_bin_var]
+    objective      = qcm.data["objective"]
+    max_depth      = qcm.data["maximum_depth"]
+    maximum_layers = qcm.data["maximum_layers"]
+    z_bin_var      = qcm.variables[:z_bin_var]
 
     commute_pairs, commute_pairs_prodIdentity = QCO.get_commutative_gate_pairs(qcm.data["gates_dict"], qcm.data["decomposition_type"])
 
@@ -256,7 +257,7 @@ function constraint_commutative_gate_pairs(qcm::QuantumCircuitModel)
         for i = 1:length(commute_pairs)
             if objective in ["minimize_layers"]
                 JuMP.@constraint(qcm.model, [d=1:(max_depth-1)], z_bin_var[commute_pairs[i][2], d] + z_bin_var[commute_pairs[i][1], d+1] <= 1 
-                +  sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:max_depth) -  sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:max_depth))
+                +  sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:maximum_layers) -  sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:maximum_layers))
             else
                 JuMP.@constraint(qcm.model, [d=1:(max_depth-1)], z_bin_var[commute_pairs[i][2], d] + z_bin_var[commute_pairs[i][1], d+1] <= 1)
             end
@@ -270,9 +271,9 @@ function constraint_commutative_gate_pairs(qcm::QuantumCircuitModel)
         for i = 1:length(commute_pairs_prodIdentity)
             if objective in ["minimize_layers"]
                 JuMP.@constraint(qcm.model, [d=1:(max_depth-1)], z_bin_var[commute_pairs_prodIdentity[i][2], d] + z_bin_var[commute_pairs_prodIdentity[i][1], d+1] <= 1
-                +  sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:max_depth) -  sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:max_depth))
+                +  sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:maximum_layers) -  sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:maximum_layers))
                 JuMP.@constraint(qcm.model, [d=1:(max_depth-1)], z_bin_var[commute_pairs_prodIdentity[i][1], d] + z_bin_var[commute_pairs_prodIdentity[i][2], d+1] <= 1
-                +  sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:max_depth) -  sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:max_depth))
+                +  sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:maximum_layers) -  sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:maximum_layers))
             else
                 JuMP.@constraint(qcm.model, [d=1:(max_depth-1)], z_bin_var[commute_pairs_prodIdentity[i][2], d] + z_bin_var[commute_pairs_prodIdentity[i][1], d+1] <= 1)
                 JuMP.@constraint(qcm.model, [d=1:(max_depth-1)], z_bin_var[commute_pairs_prodIdentity[i][1], d] + z_bin_var[commute_pairs_prodIdentity[i][2], d+1] <= 1)
@@ -675,36 +676,38 @@ end
 
 function constraint_layer_assigments(qcm::QuantumCircuitModel)
 
-    max_depth = qcm.data["maximum_depth"]
+    max_depth      = qcm.data["maximum_depth"]
+    maximum_layers = qcm.data["maximum_layers"]
     
-    JuMP.@constraint(qcm.model, [l=2:max_depth], qcm.variables[:layer_bin_var][1,l] == 0)
+    JuMP.@constraint(qcm.model, [l=2:maximum_layers], qcm.variables[:layer_bin_var][1,l] == 0)
     JuMP.@constraint(qcm.model, qcm.variables[:layer_bin_var][1, 1] == 1)
 
-    JuMP.@constraint(qcm.model, [d=1:max_depth], sum(qcm.variables[:layer_bin_var][d,l] for l=1:max_depth) == 1)
+    JuMP.@constraint(qcm.model, [d=1:max_depth], sum(qcm.variables[:layer_bin_var][d,l] for l=1:maximum_layers) == 1)
 
-    JuMP.@constraint(qcm.model, [d=1:max_depth-1], sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:max_depth) <= sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:max_depth))
-    JuMP.@constraint(qcm.model, [d=1:max_depth-1], sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:max_depth) <= 1 + sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:max_depth))
+    JuMP.@constraint(qcm.model, [d=1:max_depth-1], sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:maximum_layers) <= sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:maximum_layers))
+    JuMP.@constraint(qcm.model, [d=1:max_depth-1], sum(qcm.variables[:layer_bin_var][d+1,l]*l for l=1:maximum_layers) <= 1 + sum(qcm.variables[:layer_bin_var][d,l]*l for l=1:maximum_layers))
 
     return
 end
 
 function constraint_single_gate_per_qubit_per_layer(qcm::QuantumCircuitModel)
 
-    max_depth  = qcm.data["maximum_depth"]
-    num_gates  = size(qcm.data["gates_real"])[3]
-    num_qubits = qcm.data["num_qubits"]
-    gates_dict = qcm.data["gates_dict"]
+    max_depth      = qcm.data["maximum_depth"]
+    maximum_layers = qcm.data["maximum_layers"]
+    num_gates      = size(qcm.data["gates_real"])[3]
+    num_qubits     = qcm.data["num_qubits"]
+    gates_dict     = qcm.data["gates_dict"]
     
     #first gate in first layer 
-    JuMP.@constraint(qcm.model, [n=1:num_gates, l=2:max_depth], qcm.variables[:delta_bin_var][n,1,l] == 0)
+    JuMP.@constraint(qcm.model, [n=1:num_gates, l=2:maximum_layers], qcm.variables[:delta_bin_var][n,1,l] == 0)
     
     #auxiliary variable multiplication constraints 
-    JuMP.@constraint(qcm.model, [n=1:num_gates, d=1:max_depth, l=1:max_depth], qcm.variables[:delta_bin_var][n,d,l] <= qcm.variables[:z_bin_var][n,d])
-    JuMP.@constraint(qcm.model, [n=1:num_gates, d=1:max_depth, l=1:max_depth], qcm.variables[:delta_bin_var][n,d,l] <= qcm.variables[:layer_bin_var][d,l])
-    JuMP.@constraint(qcm.model, [n=1:num_gates, d=1:max_depth, l=1:max_depth], qcm.variables[:delta_bin_var][n,d,l] >= qcm.variables[:z_bin_var][n,d] + qcm.variables[:layer_bin_var][d,l] -1)
+    JuMP.@constraint(qcm.model, [n=1:num_gates, d=1:max_depth, l=1:maximum_layers], qcm.variables[:delta_bin_var][n,d,l] <= qcm.variables[:z_bin_var][n,d])
+    JuMP.@constraint(qcm.model, [n=1:num_gates, d=1:max_depth, l=1:maximum_layers], qcm.variables[:delta_bin_var][n,d,l] <= qcm.variables[:layer_bin_var][d,l])
+    JuMP.@constraint(qcm.model, [n=1:num_gates, d=1:max_depth, l=1:maximum_layers], qcm.variables[:delta_bin_var][n,d,l] >= qcm.variables[:z_bin_var][n,d] + qcm.variables[:layer_bin_var][d,l] -1)
 
     #each qubit used only once per layer
-    JuMP.@constraint(qcm.model, [q=1:num_qubits, l=1:max_depth], sum(sum(qcm.variables[:delta_bin_var][n,d,l] for d=1:max_depth) for n in _get_all_gates_for_qubit(gates_dict, q)) <= 1)
+    JuMP.@constraint(qcm.model, [q=1:num_qubits, l=1:maximum_layers], sum(sum(qcm.variables[:delta_bin_var][n,d,l] for d=1:max_depth) for n in _get_all_gates_for_qubit(gates_dict, q)) <= 1)
     
     return
 end

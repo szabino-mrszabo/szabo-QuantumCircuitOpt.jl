@@ -168,18 +168,20 @@ function variable_binary_products(qcm::QuantumCircuitModel)
 end
 
 function variable_layer_assignment(qcm::QuantumCircuitModel)
-    max_depth   = qcm.data["maximum_depth"]
+    max_depth      = qcm.data["maximum_depth"]
+    maximum_layers = qcm.data["maximum_layers"]
 
-    qcm.variables[:layer_bin_var] = JuMP.@variable(qcm.model, layer_bin_var[1:max_depth,1:max_depth], Bin)
+    qcm.variables[:layer_bin_var] = JuMP.@variable(qcm.model, layer_bin_var[1:max_depth,1:maximum_layers], Bin)
            
     return
 end
 
 function variable_gates_onoff_layers(qcm::QuantumCircuitModel)
-    max_depth   = qcm.data["maximum_depth"]
+    max_depth      = qcm.data["maximum_depth"]
+    maximum_layers = qcm.data["maximum_layers"]
     num_gates   = size(qcm.data["gates_real"])[3]
 
-    qcm.variables[:delta_bin_var] = JuMP.@variable(qcm.model, 0<=delta_bin_var[1:num_gates,1:max_depth,1:max_depth]<=1)
+    qcm.variables[:delta_bin_var] = JuMP.@variable(qcm.model, 0<=delta_bin_var[1:num_gates,1:max_depth,1:maximum_layers]<=1)
            
     return
 end

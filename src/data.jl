@@ -14,11 +14,14 @@ function get_data(params::Dict{String, Any}; eliminate_identical_gates = true)
         Memento.error(_LOGGER, "Number of qubits has to be specified by the user")
     num_qubits < 2 && Memento.error(_LOGGER, "Minimum of 2 qubits is necessary")
 
-    # Depth
+    # Max number of gates
     maximum_depth = haskey(params, "maximum_depth") ?
         params["maximum_depth"] :
         Memento.error(_LOGGER, "Maximum depth of the decomposition has to be specified by the user")
     maximum_depth < 2 && Memento.error(_LOGGER, "Minimum depth of 2 is necessary")
+
+    # Max number of layers
+    maximum_layers = get(params, "maximum_layers", maximum_depth)
 
     # Elementary gates
     (!haskey(params, "elementary_gates") || isempty(params["elementary_gates"])) &&
@@ -71,6 +74,7 @@ function get_data(params::Dict{String, Any}; eliminate_identical_gates = true)
     
     data = Dict{String, Any}("num_qubits" => num_qubits,
                              "maximum_depth" => maximum_depth,
+                             "maximum_layers" => maximum_layers,
                              "gates_dict" => gates_dict_unique,
                              "gates_real" => M_real_unique,
                              "initial_gate" => initial_gate,

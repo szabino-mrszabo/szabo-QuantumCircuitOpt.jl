@@ -78,15 +78,16 @@ end
 
 function objective_minimize_total_layers(qcm::QuantumCircuitModel)
     
-    max_depth    = qcm.data["maximum_depth"]
-    identity_idx = qcm.data["identity_idx"]
-    num_gates    = size(qcm.data["gates_real"])[3]
+    max_depth      = qcm.data["maximum_depth"]
+    maximum_layers = qcm.data["maximum_layers"]
+    identity_idx   = qcm.data["identity_idx"]
+    num_gates      = size(qcm.data["gates_real"])[3]
 
     decomposition_type = qcm.data["decomposition_type"]
 
     if !isempty(identity_idx)
         if decomposition_type in ["exact_optimal", "optimal_global_phase"]
-            JuMP.@objective(qcm.model, Min, sum(l*qcm.variables[:layer_bin_var][max_depth,l] for l=1:max_depth ))
+            JuMP.@objective(qcm.model, Min, sum(l*qcm.variables[:layer_bin_var][max_depth,l] for l=1:maximum_layers ))
 
         elseif decomposition_type == "exact_feasible"
             Memento.error(_LOGGER, "`exact_feasible` decomposition is not supported for this objective")
