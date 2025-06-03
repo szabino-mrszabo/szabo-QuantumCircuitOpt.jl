@@ -186,27 +186,17 @@ function kron_layer(
     qubit_idx = 1
     gate_idx  = 1
     
-    while qubit_idx ≤ num_qubits
-        if gate_idx > length(sorted_gates) ||
-           minimum(sorted_gates[gate_idx].qubits) > qubit_idx
-
-            push!(factors, "I")
-            qubit_idx += 1
-            continue
-        end
-
-        # Gate begins at this wire
+    while gate_idx ≤ length(sorted_gates)
+       
         current_gate   = sorted_gates[gate_idx]
         qubit_indices  = collect(current_gate.qubits)
 
         if length(qubit_indices) == 1
-            push!(factors, current_gate.label)
+            push!(factors, string(current_gate.label,"_", qubit_indices[1]))
         else
             push!(factors, string(current_gate.label, "_{", join(qubit_indices, ","), "}"))
         end
 
-        lastq = maximum(qubit_indices)   # largest wire index touched
-        qubit_idx = lastq + 1
         gate_idx  += 1
     end
     

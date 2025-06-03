@@ -44,6 +44,11 @@ function variable_QCModel_balas(qcm::QuantumCircuitModel)
         QCO.variable_slack_var_outer_approximation(qcm)
     end
 
+    if qcm.data["objective"] == "minimize_layers"
+        QCO.variable_layer_assignment(qcm)
+        QCO.variable_gates_onoff_layers(qcm)
+    end
+
     QCO.variable_QCModel_valid(qcm)
 
     return
@@ -75,6 +80,11 @@ function variable_QCModel_compact(qcm::QuantumCircuitModel)
     if qcm.data["decomposition_type"] == "approximate"
         QCO.variable_slack_for_feasibility(qcm)
         QCO.variable_slack_var_outer_approximation(qcm)
+    end
+
+    if qcm.data["objective"] == "minimize_layers"
+        QCO.variable_layer_assignment(qcm)
+        QCO.variable_gates_onoff_layers(qcm)
     end
 
     QCO.variable_QCModel_valid(qcm)
@@ -118,6 +128,12 @@ function constraint_QCModel_compact(qcm::QuantumCircuitModel)
 
     QCO.constraint_QCModel_valid(qcm)
 
+    if qcm.data["objective"] == "minimize_layers"
+        QCO.constraint_layer_assigments(qcm)  
+        QCO.constraint_single_gate_per_qubit_per_layer(qcm)
+
+    end
+
     return
 end
 
@@ -159,6 +175,8 @@ function objective_QCModel(qcm::QuantumCircuitModel)
         QCO.objective_minimize_specific_gates(qcm, "cnot_gate")
     elseif qcm.data["objective"] == "minimize_T"
         QCO.objective_minimize_specific_gates(qcm, "T_gate")
+    elseif qcm.data["objective"] == "minimize_layers"
+        QCO.objective_minimize_total_layers(qcm)    
     end
 
     return

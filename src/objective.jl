@@ -75,3 +75,29 @@ function objective_minimize_specific_gates(
 
     return
 end
+
+function objective_minimize_total_layers(qcm::QuantumCircuitModel)
+    
+    max_depth    = qcm.data["maximum_depth"]
+    identity_idx = qcm.data["identity_idx"]
+    num_gates    = size(qcm.data["gates_real"])[3]
+
+    decomposition_type = qcm.data["decomposition_type"]
+
+    if !isempty(identity_idx)
+        if decomposition_type in ["exact_optimal", "optimal_global_phase"]
+            JuMP.@objective(qcm.model, Min, sum(l*qcm.variables[:layer_bin_var][max_depth,l] for l=1:max_depth ))
+
+        elseif decomposition_type == "exact_feasible"
+            Memento.error(_LOGGER, "`exact_feasible` decomposition is not supported for this objective")
+            
+        elseif decomposition_type == "approximate"
+            Memento.error(_LOGGER, "`approximate` decomposition is not supported for this objective")
+            
+        end
+    else
+        QCO.objective_feasibility(qcm)
+    end                              
+    
+    return
+end
