@@ -266,7 +266,7 @@ function constraint_commutative_gate_pairs(qcm::QuantumCircuitModel)
 
     if objective in ["minimize_layers"]
         parallelizable_pairs = QCO.get_parallelizable_gate_pairs(qcm.data["gates_dict"], qcm.data["decomposition_type"])
-        println(parallelizable_pairs)
+        
         if !isempty(parallelizable_pairs)
             (length(parallelizable_pairs) == 1) && (Memento.info(_LOGGER, "Detected $(length(parallelizable_pairs)) input elementary gate pair which act on different qubits"))
             (length(parallelizable_pairs) > 1)  && (Memento.info(_LOGGER, "Detected $(length(parallelizable_pairs)) input elementary gate pairs which act on different qubits"))
