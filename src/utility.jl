@@ -98,6 +98,41 @@ function get_commutative_gate_pairs(M::Dict{String,Any}, decomposition_type::Str
     return commute_pairs, commute_pairs_prodIdentity
 end
 
+function get_parallelizable_gate_pairs(M::Dict{String,Any}, decomposition_type::String; identity_in_pairs = true)
+    num_gates = length(keys(M))
+    parallelizable_pairs = Array{Tuple{Int64,Int64},1}()
+        
+    Id = Matrix{Complex{Float64}}(Matrix(LA.I, size(M["1"]["matrix"])))
+        
+    # Find parallelizable pairs
+    for i = 1:(num_gates-1), j = (i+1):num_gates
+        # Skip if either gate is Identity
+        if ("Identity" in M["$i"]["type"]) || ("Identity" in M["$j"]["type"])
+            continue
+        end
+        
+        q_i, q_j = M["$i"]["qubit_loc"], M["$j"]["qubit_loc"]
+            
+        # Check for parallelizable pairs
+        isempty(intersect(q_i, q_j)) && push!(parallelizable_pairs, (i,j))
+    end
+    
+    #=
+    # Add Identity pairs if requested 
+    # This slows down the search slightly
+    if identity_in_pairs
+        identity_idx = [parse(Int64, i) for i in keys(M) if "Identity" in M[i]["type"]]
+        
+        for id_idx in identity_idx, j = 1:num_gates
+            j != id_idx && push!(parallelizable_pairs, (j, id_idx))
+        end
+    end
+    =#
+    
+    return parallelizable_pairs
+end
+
+
 """
     get_redundant_gate_product_pairs(M::Dict{String,Any}, decomposition_type::String)
 
@@ -134,6 +169,40 @@ function get_redundant_gate_product_pairs(M::Dict{String,Any}, decomposition_typ
     end
 
     return redundant_pairs_idx
+end
+
+function get_redundant_gate_product_triplets(M::Dict{String,Any},  num_qubits::Int64, decomposition_type::String)
+    num_gates = length(keys(M))
+    redundant_triplets_idx = Array{Tuple{Int64,Int64,Int64},1}()
+    Id = I(size(first(values(M))["matrix"], 1))
+
+
+    # Non-Identity redundant triplets
+    for qubit = 1:num_qubits
+        relevant_gates =  _get_all_gates_for_qubit(M, qubit)
+                
+        for (i,j,k) in Base.Iterators.product(relevant_gates, relevant_gates, relevant_gates)
+
+            M_i = M["$i"]["matrix"]
+            M_j = M["$j"]["matrix"]
+            M_k = M["$k"]["matrix"]
+        
+            if !isapprox(M_i*M_j, Id, atol = 1E-4) & !isapprox(M_j*M_k, Id, atol = 1E-4)
+                for prd in _get_all_gates_for_qubit(M, qubit)            
+                    M_prd = M["$prd"]["matrix"]
+
+                    if decomposition_type in ["optimal_global_phase"]
+                        QCO.isapprox_global_phase(M_i*M_j*M_k, M_prd) && push!(redundant_triplets_idx, (i,j,k))
+                    else
+                        isapprox(M_i*M_j*M_k, M_prd, atol = 1E-4) &&  push!(redundant_triplets_idx, (i,j,k))
+                    end        
+                end
+            end
+        end
+
+    end
+
+    return redundant_triplets_idx
 end
 
 """
@@ -735,3 +804,22 @@ is_zero(x; tol = 1E-6) = isapprox(x, 0, atol = tol)
 #     length(qubit_loc) == 0 && Memento.error(_LOGGER, "Atleast one qubit has to be specified for an input gate")
 #     return length(qubit_loc) > 1
 # end
+
+# Helper function to et all gates from the elementary set that act on the respective qubit
+
+function _get_all_gates_for_qubit(gates_dict::Dict{String,Any}, qubit::Int)
+
+    q = string(qubit)
+    pat = "_" * q * "(_|\$)"
+    re  = Regex(pat)            
+
+    return [ parse(Int, idx_str)
+             for (idx_str, gate) in pairs(gates_dict)
+             if any(
+                   name -> occursin(re, name),
+                   occursin(kron_symbol, gate["type"][1]) ?
+                     QCO._parse_gates_with_kron_symbol(gate["type"][1]) :
+                     (gate["type"][1],)
+                 )
+           ]
+end

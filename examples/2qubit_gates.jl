@@ -37,6 +37,22 @@ function controlled_Z()
 
 end
 
+function controlled_Z_full()
+
+    println(">>>>> Controlled-Z Gate <<<<<")
+
+    return Dict{String, Any}(
+    
+    "num_qubits" => 2, 
+    "maximum_depth" => 8,
+    "elementary_gates" => ["X_1", "X_2", "Z_1", "Z_2", "H_1", "H_2", "CNot_1_2", "CNot_2_1", "Identity"], 
+    "target_gate" => QCOpt.CZGate(),
+    "objective" => "minimize_depth", 
+    "decomposition_type" => "exact_optimal",
+    )
+
+end
+
 function controlled_V()
 
     println(">>>>> Controlled-V Gate <<<<<")

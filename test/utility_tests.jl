@@ -116,6 +116,24 @@ end
     @test length(redundant_pairs) == 0
 end
 
+@testset "Tests: get_redundant_gate_product_triplets" begin
+    params = Dict{String, Any}(
+        "num_qubits" => 2,
+        "maximum_depth" => 8,
+        "elementary_gates" => ["X_1", "X_2", "Z_1", "Z_2", "H_1", "H_2", "CNot_1_2", "CNot_2_1", "Identity"],
+        "target_gate" => QCO.CZGate()
+    )
+    data = QCO.get_data(params)
+    redundant_triplets = QCO.get_redundant_gate_product_triplets(data["gates_dict"], data["num_qubits"], data["decomposition_type"])
+    @test length(redundant_triplets) == 16
+
+    # With global phase equivalence
+    params["decomposition_type"] = "optimal_global_phase"
+    data = QCO.get_data(params)
+    redundant_triplets = QCO.get_redundant_gate_product_triplets(data["gates_dict"], data["num_qubits"], data["decomposition_type"])
+    @test length(redundant_triplets) == 20
+end
+
 @testset "Tests: get_idempotent_gates" begin
     params = Dict{String, Any}(
         "num_qubits" => 2,
