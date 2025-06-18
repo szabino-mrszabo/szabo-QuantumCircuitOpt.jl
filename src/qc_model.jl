@@ -116,7 +116,8 @@ function constraint_QCModel_compact(qcm::QuantumCircuitModel)
     QCO.constraint_gate_product_linearization(qcm)
 
     if qcm.data["decomposition_type"] == "optimal_global_phase"
-        QCO.constraint_target_gate_condition_glphase(qcm)  
+        QCO.constraint_target_gate_condition_glphase(qcm) 
+        QCO.constraint_target_gate_condition_glphase2(qcm)  
     else 
         QCO.constraint_target_gate_condition_compact(qcm)
     end

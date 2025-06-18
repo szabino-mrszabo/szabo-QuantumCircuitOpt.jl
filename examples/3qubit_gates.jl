@@ -98,6 +98,19 @@ function CNot_1_3()
     )
 end
 
+function CNot_1_3_full()
+
+    return Dict{String, Any}(
+    "num_qubits" => 3,
+    "maximum_depth" => 8,
+    # "elementary_gates" => ["CNot_1_2", "CNot_2_3", "Identity"], 
+    "elementary_gates" => ["H_1", "H_2", "H_3", "X_1", "X_2", "X_3", "Z_1", "Z_2", "Z_3", "CNot_1_2", "CNot_3_2", "CNot_2_1", "CNot_2_3", "Identity"],
+    "target_gate" => QCOpt.unitary("CNot_1_3", 3),
+    "objective" => "minimize_depth",
+    "decomposition_type" => "optimal_global_phase",
+    )
+end
+
 function fredkin()
 
     return Dict{String, Any}(
@@ -168,7 +181,8 @@ function toffoli_right()
     "maximum_depth" => 8,
     "elementary_gates" => ["H_3", "T_1", "T_2", "T_3", "Tdagger_1", "Tdagger_2", "Tdagger_3", "CNot_1_2", "CNot_2_3", "CNot_1_3", "Identity"],
     "target_gate" => target_gate(), 
-    "objective" => "minimize_depth"
+    "objective" => "minimize_depth",
+    "decomposition_type" => "exact_optimal"
     )
 end
 

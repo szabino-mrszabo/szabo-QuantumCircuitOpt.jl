@@ -215,6 +215,47 @@ function constraint_target_gate_condition_glphase(qcm::QuantumCircuitModel)
     return
 end
 
+function constraint_target_gate_condition_glphase2(qcm::QuantumCircuitModel)
+    max_depth      = qcm.data["maximum_depth"]
+    n_r            = size(qcm.data["gates_real"])[1]
+    n_c            = size(qcm.data["gates_real"])[2]
+    target_gate    = qcm.data["target_gate"]
+    U_var          = qcm.variables[:U_var]
+
+    if qcm.data["are_gates_real"]
+        
+        for i in 1:n_r, j in 1:n_c
+            if !(i==j)
+                JuMP.@constraint(qcm.model, sum( U_var[i,k,max_depth] * target_gate[j,k] for k=1:n_r) == 0)
+            end
+        end
+
+        for i in 1:n_r, j in i+1:n_r
+                JuMP.@constraint(qcm.model, sum( U_var[i,k,max_depth] * target_gate[i,k] for k=1:n_r) == sum( U_var[j,k,max_depth] * target_gate[j,k] for k=1:n_r))
+        end
+
+    else
+        for i in 1:2:n_r, j in 1:2:n_c
+            if !(i==j)
+                JuMP.@constraint(qcm.model, sum( U_var[i,k,max_depth] * target_gate[j,k] for k=1:n_r) == 0)
+                JuMP.@constraint(qcm.model, sum( U_var[i,k,max_depth] * target_gate[j+1,k] for k=1:n_r) == 0)
+                JuMP.@constraint(qcm.model, sum( U_var[i+1,k,max_depth] * target_gate[j,k] for k=1:n_r) == 0)
+                JuMP.@constraint(qcm.model, sum( U_var[i+1,k,max_depth] * target_gate[j+1,k] for k=1:n_r) == 0)
+            end
+        end
+
+        for i in 1:2:n_r, j in (i+2):2:n_c
+                JuMP.@constraint(qcm.model, sum( U_var[i,k,max_depth] * target_gate[i,k] for k=1:n_r) == sum( U_var[j,k,max_depth] * target_gate[j,k] for k=1:n_r))
+                JuMP.@constraint(qcm.model, sum( U_var[i+1,k,max_depth] * target_gate[i,k] for k=1:n_r) == sum( U_var[j+1,k,max_depth] * target_gate[j,k] for k=1:n_r))
+                JuMP.@constraint(qcm.model, sum( U_var[i,k,max_depth] * target_gate[i+1,k] for k=1:n_r) == sum( U_var[j,k,max_depth] * target_gate[j+1,k] for k=1:n_r))
+                JuMP.@constraint(qcm.model, sum( U_var[i+1,k,max_depth] * target_gate[i+1,k] for k=1:n_r) == sum( U_var[j+1,k,max_depth] * target_gate[j+1,k] for k=1:n_r))
+        end
+            
+    end
+
+    return
+end
+
 function constraint_slack_var_outer_approximation(qcm::QuantumCircuitModel)
     slack_var    = qcm.variables[:slack_var]
     slack_var_oa = qcm.variables[:slack_var_oa]
