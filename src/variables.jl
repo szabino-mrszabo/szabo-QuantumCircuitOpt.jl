@@ -150,7 +150,6 @@ function variable_slack_for_feasibility(qcm::QuantumCircuitModel)
     end
 end
 
-
 function variable_slack_var_outer_approximation(qcm::QuantumCircuitModel)
     n_r     = size(qcm.data["gates_real"])[1]
     n_c     = size(qcm.data["gates_real"])[2]
@@ -182,6 +181,23 @@ function variable_gates_onoff_layers(qcm::QuantumCircuitModel)
     num_gates   = size(qcm.data["gates_real"])[3]
 
     qcm.variables[:delta_bin_var] = JuMP.@variable(qcm.model, 0<=delta_bin_var[1:num_gates,1:max_depth,1:maximum_layers]<=1)
+           
+    return
+end
+
+function variable_global_pase_cs(qcm::QuantumCircuitModel)
+    
+    qcm.variables[:phase_real_var] = JuMP.@variable(qcm.model, -1<=phase_real_var<=1)
+    qcm.variables[:phase_complex_var] = JuMP.@variable(qcm.model, -1<=phase_complex_var<=1)
+           
+    return
+end
+
+function variable_approximate_csw(qcm::QuantumCircuitModel)
+    
+    qcm.variables[:c_real_var] = JuMP.@variable(qcm.model, -1 <= c_real_var <= 1)
+    qcm.variables[:s_complex_var] = JuMP.@variable(qcm.model, -1 <= s_complex_var <= 1)
+    qcm.variables[:w_fidelity_var] = JuMP.@variable(qcm.model, 0 <= w_fidelity_var <= 1)
            
     return
 end

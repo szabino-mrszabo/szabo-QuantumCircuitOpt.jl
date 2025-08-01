@@ -483,3 +483,67 @@ function minimize_T_gate()
     )
 end
 
+
+function Hadamard_Fib()
+
+    println(">>>>> Hadamard with Fibonacci Anyons <<<<<")
+
+    return Dict{String, Any}(
+    
+    "num_qubits" => 2, 
+    "maximum_depth" => 10,
+    "elementary_gates" => ["Fib1_1", "Fib2_1", "Fib1dagger_1", "Fib2dagger_1", "Identity"], 
+    "target_gate" => 1im*QCOpt.unitary("H_1", 2),
+    "objective" => "minimize_depth", 
+    "decomposition_type" => "approximate",
+    )
+
+end
+
+function T_Fib()
+
+    println(">>>>> T-gate with Fibonacci Anyons <<<<<")
+
+    return Dict{String, Any}(
+    
+    "num_qubits" => 2, 
+    "maximum_depth" => 12,
+    "elementary_gates" => ["Fib1_1", "Fib2_1", "Fib1dagger_1", "Fib2dagger_1", "Identity"], 
+    "target_gate" =>  exp(-1im * pi / 8) * QCOpt.unitary("T_1", 2),
+    "objective" => "minimize_depth", 
+    "decomposition_type" => "approximate",
+    )
+
+end
+
+function CNot_Fib()
+
+    println(">>>>> CNot with Fibonacci Anyons <<<<<")
+
+    return Dict{String, Any}(
+    
+    "num_qubits" => 2, 
+    "maximum_depth" => 10,
+    "elementary_gates" => ["Fib1_1", "Fib2_1", "Fib1dagger_1", "Fib2dagger_1", "Fib1_2", "Fib2_2", "Fib1dagger_2", "Fib2dagger_2", "Fib3_1_2", "Fib3dagger_1_2", "Identity"], 
+    "target_gate" =>  exp(-1im * pi / 4) * QCOpt.unitary("CX_1_2", 2),
+    "objective" => "minimize_depth", 
+    "decomposition_type" => "approximate",
+    )
+
+end
+
+function Swap_Fib()
+
+    println(">>>>> SWAP with Fibonacci Anyons <<<<<")
+
+    return Dict{String, Any}(
+    
+    "num_qubits" => 2, 
+    "maximum_depth" => 10,
+    "elementary_gates" => ["Fib1_1", "Fib2_1", "Fib1dagger_1", "Fib2dagger_1", "Fib1_2", "Fib2_2", "Fib1dagger_2", "Fib2dagger_2", "Fib3_1_2", "Fib3dagger_1_2", "Identity"], 
+    "target_gate" => exp(-1im * pi / 4) *QCOpt.unitary("Swap_1_2", 2),
+    "objective" => "minimize_depth", 
+    "decomposition_type" => "approximate",
+    )
+
+end

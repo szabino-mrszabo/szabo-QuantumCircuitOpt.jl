@@ -7,7 +7,8 @@ IMPORTANT: a) Update the lists below whenever a 1 or 2 qubit gate is added to th
 const ONE_QUBIT_GATES_ANGLE_PARAMETERS     = ["U3", "U2", "U1", "R", "RX", "RY", "RZ", "Phase"]
 
 const ONE_QUBIT_GATES_CONSTANTS            = ["Identity", "I", "H", "X", "Y", "Z", "S", 
-                                              "Sdagger", "T", "Tdagger", "SX", "SXdagger"]
+                                              "Sdagger", "T", "Tdagger", "SX", "SXdagger",
+                                              "Fib1", "Fib2", "Fib1dagger", "Fib2dagger"]
 
 const TWO_QUBIT_GATES_ANGLE_PARAMETERS     = ["CRX", "CRXRev", "CRY", "CRYRev", "CRZ", "CRZRev", 
                                               "CU3", "CU3Rev"]
@@ -21,7 +22,7 @@ const MULTI_CONTROLLED_GATES   = ["MC_gates"]
 # Gates invariant to qubit flip
 const TWO_QUBIT_GATES_CONSTANTS_SYMMETRIC  = ["Swap", "SSwap", "iSwap", "Sycamore", "DCX", "W", "M", "CZ",
                                               "QFT2", "HCoin", "GroverDiffusion", "CS", "CSdagger", 
-                                              "CT", "CTdagger"]
+                                              "CT", "CTdagger", "Fib3", "Fib3dagger"]
 
 # Gates non-invariant to qubit flip
 const TWO_QUBIT_GATES_CONSTANTS_ASYMMETRIC = ["CNot", "CNotRev", "CX", "CXRev", "CY", "CYRev", 
@@ -478,6 +479,75 @@ P(\lambda) = \begin{pmatrix}
 function PhaseGate(λ::Number)
     return QCO.U1Gate(λ)
 end
+
+
+function Fib1Gate()
+
+    return Array{Complex{Float64},2}(exp(1im * pi / 10) * [exp(-4im * pi  / 5) 0; 0 exp(3im * pi  / 5)])
+
+end
+
+function Fib1daggerGate()
+    
+    return Array{Complex{Float64},2}(exp(-1im * pi / 10) * [exp(4im * pi  / 5) 0; 0 exp(-3im * pi  / 5)])
+
+end
+
+function Fib2Gate()
+    phi = (1 + sqrt(5)) / 2
+    a = 1 / phi
+    b = sqrt(a)
+    r1 = exp(-4im * pi / 5)
+    rτ = exp(3im * pi / 5)
+    # F-matrix
+    F = [a b; b -a]
+    R = [r1 0; 0 rτ]
+    # σ2 = F * R * F
+    # For Fibonacci, F is its own inverse (since a^2 + b^2 = 1)
+    return Array{Complex{Float64},2}(exp(1im * pi / 10) * F * R * F)
+end
+
+function Fib2daggerGate()
+    phi = (1 + sqrt(5)) / 2
+    a = 1 / phi
+    b = sqrt(a)
+    r1 = exp(4im * pi / 5)    # conjugate of -4im*pi/5
+    rτ = exp(-3im * pi / 5)   # conjugate of 3im*pi/5
+    F = [a b; b -a]
+    R = [r1 0; 0 rτ]
+    return Array{Complex{Float64},2}(exp(-1im * pi / 10) * F * R * F)
+end
+
+function Fib3Gate()
+    phi = (1 + sqrt(5)) / 2
+    a = 1 / phi
+    b = sqrt(a)
+    u = exp(3im * pi / 5)
+    v = exp(-4im * pi / 5)
+    M = exp(1im * pi / 10) * [
+        a * u       0         0         b * v;
+        0       -a * u     b * v        0;
+        0        b * v     a * u        0;
+        b * v        0         0     -a * u
+    ]
+    return Array{Complex{Float64},2}(M)
+end
+
+function Fib3daggerGate()
+    phi = (1 + sqrt(5)) / 2
+    a = 1 / phi
+    b = sqrt(a)
+    u = exp(-3im * pi / 5)   # complex conjugate of exp(3im * pi / 5)
+    v = exp(4im * pi / 5)    # complex conjugate of exp(-4im * pi / 5)
+    M = exp(-1im * pi / 10) * [
+        a * u       0         0         b * v;
+        0       -a * u     b * v        0;
+        0        b * v     a * u        0;
+        b * v        0         0     -a * u
+    ]
+    return Array{Complex{Float64},2}(M)
+end
+
 
 #-------------------------------------#
 #            TWO-QUBIT GATES          #
